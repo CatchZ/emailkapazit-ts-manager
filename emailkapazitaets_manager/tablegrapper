@@ -4,60 +4,66 @@ from selenium.webdriver.common.by import By
 from selenium.webdriver.common.keys import Keys
 from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
+from selenium.webdriver.common.action_chains import ActionChains
 from webdriver_manager.chrome import ChromeDriverManager
-import time
 
-# Webdriver starten
-service = Service(ChromeDriverManager().install())
-driver = webdriver.Chrome(service=service)
+def login(driver, username, password):
+    driver.get("https://login.biohost.de/accounts/login/?next=/")
+    WebDriverWait(driver, 10).until(EC.presence_of_element_located((By.NAME, "username")))
+    driver.find_element(By.NAME, "username").send_keys(username)
+    driver.find_element(By.NAME, "password").send_keys(password)
+    driver.find_element(By.XPATH, "//input[@type='submit' and @class='btn btn-primary']").click()
 
-# Webseite aufrufen
-driver.get("https://login.biohost.de/accounts/login/?next=/")
-
-# Warten, bis das Login-Formular geladen ist
-WebDriverWait(driver, 10).until(EC.presence_of_element_located((By.NAME, "username")))
-
-# Login-Daten eingeben
-username = driver.find_element(By.NAME, "username")
-password = driver.find_element(By.NAME, "password")
-
-username.send_keys("10485")
-password.send_keys("K9pLjSvfy")
-
-# Login-Button finden und klicken
-login_button = driver.find_element(By.XPATH, "//input[@type='submit' and @class='btn btn-primary']")
-login_button.click()
-
-# Warten, bis die URL sich ändert oder ein bestimmtes Element auf der neuen Seite erscheint
-try:
-    WebDriverWait(driver, 10).until(EC.url_changes("https://login.biohost.de/accounts/login/?next=/"))
-    print("URL hat sich geändert:", driver.current_url)
-except Exception as e:
-    print("Fehler beim Warten auf URL-Änderung:", e)
-
-# Warten, bis ein bestimmtes Element auf der neuen Seite erscheint
-try:
+def navigate_to_mail_page(driver):
     WebDriverWait(driver, 10).until(EC.presence_of_element_located((By.XPATH, "//html/body/header/div[2]/span[2]/i")))
-    webspace_button = driver.find_element(By.XPATH, "//html/body/header/div[2]/span[2]/i")
-    webspace_button.click()
-    print("Webspace-Button geklickt")
-
-    # Warten, bis das nächste Element erscheint und klicken
+    driver.find_element(By.XPATH, "//html/body/header/div[2]/span[2]/i").click()
     WebDriverWait(driver, 10).until(EC.presence_of_element_located((By.XPATH, "//html/body/header/div[2]/ul/li[2]/a")))
-    extrapace50_button = driver.find_element(By.XPATH, "//html/body/header/div[2]/ul/li[2]/a")
-    extrapace50_button.click()
-    print("Extrapace50-Button geklickt")
-except Exception as e:
-    print("Fehler beim Interagieren mit der neuen Seite:", e)
+    driver.find_element(By.XPATH, "//html/body/header/div[2]/ul/li[2]/a").click()
+    driver.get("https://login.biohost.de/#ajax/mail.html")
+    WebDriverWait(driver, 10).until(EC.presence_of_element_located((By.XPATH, "//html/body/header/div[2]/span[2]/i")))
+    driver.find_element(By.XPATH, "//html/body/header/div[2]/span[2]/i").click()
 
-driver.get("https://login.biohost.de/#ajax/mail.html")
+def sort_table_by_belegt(driver):
+    WebDriverWait(driver, 10).until(EC.presence_of_element_located((By.XPATH, "//th[@aria-label='% belegt: activate to sort column ascending']")))
+    belegt_button = driver.find_element(By.XPATH, "//th[@aria-label='% belegt: activate to sort column ascending']")
+    actions = ActionChains(driver)
+    actions.move_to_element(belegt_button).click().perform()
+    WebDriverWait(driver, 10).until(EC.presence_of_element_located((By.XPATH, "//th[@aria-label='% belegt: activate to sort column descending']")))
 
+def extract_table_data(driver):
+    email_belegt_liste = []
+    WebDriverWait(driver, 10).until(EC.presence_of_element_located((By.XPATH, "//table[@id='dTable']")))
+    table = driver.find_element(By.XPATH, "//table[@id='dTable']")
+    rows = table.find_elements(By.XPATH, ".//tbody/tr")
 
-# Aktuelle URL ausgeben
-print(driver.current_url)
+    for row in rows:
+        email = row.find_element(By.XPATH, ".//td[1]").text
+        belegt = row.find_element(By.XPATH, ".//td[5]").text
+        email_belegt_liste.append((email, belegt))
 
-# Browser offen lassen, um die Seite zu sehen
-input("Drücken Sie Enter, um den Browser zu schließen...")
+    return email_belegt_liste
 
-# Browser schließen
-driver.quit()
+def main():
+    service = Service(ChromeDriverManager().install())
+    with webdriver.Chrome(service=service) as driver:
+        try:
+            login(driver, "10485", "K9pLjSvfy")
+            navigate_to_mail_page(driver)
+            sort_table_by_belegt(driver)
+            email_belegt_liste = extract_table_data(driver)
+
+            # Liste von Tupeln ausgeben
+            for item in email_belegt_liste:
+                print(item)
+
+            # Aktuelle URL ausgeben
+            print(driver.current_url)
+
+            # Browser offen lassen, um die Seite zu sehen
+            input("Drücken Sie Enter, um den Browser zu schließen...")
+
+        except Exception as e:
+            print("Fehler:", e)
+
+if __name__ == "__main__":
+    main()
