@@ -28,6 +28,7 @@ def sort_table_by_belegt(driver):
     belegt_button = driver.find_element(By.XPATH, "//th[@aria-label='% belegt: activate to sort column ascending']")
     actions = ActionChains(driver)
     actions.move_to_element(belegt_button).click().perform()
+    actions.move_to_element(belegt_button).click().perform() # sonnst ergebnis nicht absteigend
     WebDriverWait(driver, 10).until(EC.presence_of_element_located((By.XPATH, "//th[@aria-label='% belegt: activate to sort column descending']")))
 
 def extract_table_data(driver):
